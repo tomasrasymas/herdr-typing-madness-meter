@@ -17,7 +17,24 @@ import { startKeytap } from "./keytap.ts";
 import type { TapStatus } from "./keytap.ts";
 import { DIM, fg, renderFrame } from "./render.ts";
 import type { Line } from "./render.ts";
-import { loadHudPaneId, loadStats, saveHudPaneId, saveStats } from "./store.ts";
+import { loadHudPaneId, loadStats, saveHudPaneId as storeHudPaneId, saveStats as storeStats } from "./store.ts";
+import { startDemoFeed } from "./demo-feed.ts";
+import type { Stats } from "./game.ts";
+
+// Demo mode (TMM_DEMO=1, opened by the demo action): keys come from the
+// self-typing demo pane instead of the keyboard, stats start fresh and are
+// never saved, and the HUD never moves or touches the real HUD's state.
+const DEMO = process.env.TMM_DEMO === "1";
+const saveStats = (stats: Stats) => {
+  if (!DEMO) storeStats(stats);
+};
+const saveHudPaneId = (paneId: string | null) => {
+  if (!DEMO) storeHudPaneId(paneId);
+};
+/** Fresh demo stats, a few XP short of level 3 so a level-up shows early. */
+function demoStats(): Stats {
+  return { ...emptyStats(), totalXp: 860 };
+}
 
 const FRAME_MS = 33;
 const SAVE_DEBOUNCE_MS = 5000;
@@ -27,7 +44,7 @@ const RESET_FLAG = path.join(stateDir(), "reset-request");
 const cfg = loadConfig();
 setTierWpm(cfg.tierWpm);
 setTierColors(cfg.tierColors);
-const game = new Game(loadStats(), {
+const game = new Game(DEMO ? demoStats() : loadStats(), {
   comboGapMs: cfg.comboGapMs,
   comboMilestone: cfg.comboMilestone,
   comboStep: cfg.comboStep,
@@ -64,7 +81,7 @@ function onKey(cls: KeyClass, t: number) {
   const target = focus.focused;
   if (!target || hudFocused()) return;
   typedPane = target.pane_id;
-  if (cfg.follow && selfTab && target.pane_id !== anchorPane) void follow(target);
+  if (cfg.follow && !DEMO && selfTab && target.pane_id !== anchorPane) void follow(target);
   handle(game.key(cls, t), target.pane_id);
   scheduleSave();
   if (cls === "char" || cls === "enter") maybeBadge(target.pane_id, t);
@@ -148,7 +165,7 @@ function scheduleSave() {
 }
 
 function checkResetRequest() {
-  if (!fs.existsSync(RESET_FLAG)) return;
+  if (DEMO || !fs.existsSync(RESET_FLAG)) return;
   fs.rmSync(RESET_FLAG, { force: true });
   game.stats = emptyStats();
   game.sessionPeakWpm = 0;
@@ -359,12 +376,20 @@ async function main() {
   accent?.recover();
   if (cfg.itermTint || cfg.itermFlash || cfg.itermBadge) iterm.start();
 
-  tap = startKeytap({
-    terminals: cfg.terminals,
-    allowAnyApp: cfg.allowAnyApp,
-    onKey,
-    onStatus: (s) => (tapStatus = s),
-  });
+  if (DEMO) {
+    tapStatus = "ready";
+    startDemoFeed(onKey, () => {
+      show([{ t: " ✓ demo complete", s: fg(114, true) }], 3000);
+      setTimeout(exit, 2000);
+    });
+  } else {
+    tap = startKeytap({
+      terminals: cfg.terminals,
+      allowAnyApp: cfg.allowAnyApp,
+      onKey,
+      onStatus: (s) => (tapStatus = s),
+    });
+  }
 
   setInterval(draw, FRAME_MS);
 }

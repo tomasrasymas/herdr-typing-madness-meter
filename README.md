@@ -2,11 +2,9 @@
 
 A [herdr](https://herdr.dev) plugin that measures how mad your typing gets and turns it into a game.
 
-```
-  92 WPM ▕████████████░░░░░░░░▏ peak 104   COMBO 143 ×3.5   ACC 97%   ✦  ·   ✧    *  ✦
- LV 7 Keyboard Warrior ▕██████░░░░░░░░░░░░░░▏ 412/1,500 XP   today 4,321 chars   ·  ✦    +
- ⚑ COMBO 150!
-```
+![Typing Madness Meter demo: the pane border goes from green to red as typing speeds up, while the HUD shows WPM, combo and XP, and combo badges flash](docs/demo.gif)
+
+*The built-in demo (`typing-madness-meter.demo`) in iTerm2: speed colors, combo flashes and badges, a level-up and achievements. [Full-quality MP4](docs/demo.mp4).*
 
 - **HUD:** a small pane under the one you type in shows live WPM, combo, multiplier, accuracy, XP and level. Sparks fly after the text, and the HUD shakes harder the faster you type.
 - **Speed colors:** the border of the pane you're typing in turns green, then yellow, orange and red as your WPM climbs. Inside iTerm2, the herdr window's background also warms up with your speed.
@@ -83,6 +81,7 @@ Your stats and config are kept across updates and reinstalls.
 | `typing-madness-meter.toggle` | Opens the HUD (the "Typing Madness Meter" pane) under the focused pane, or closes it. |
 | `typing-madness-meter.stats` | Opens a popup with your level, bests, streak, a 14-day chart and achievements. Any key closes it. |
 | `typing-madness-meter.reset` | Clears all stats. |
+| `typing-madness-meter.demo` | Plays a 35-second demo in a new tab. A fake editor types by itself while a demo HUD shows every effect. It uses throwaway stats, never touches your real ones, and returns you to your tab when it ends. |
 
 - Keys count toward whichever herdr pane has focus. Keys typed while the HUD itself is focused don't count.
 - Press `q` in the HUD to close it.

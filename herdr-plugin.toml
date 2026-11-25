@@ -39,3 +39,15 @@ placement = "popup"
 width = "70%"
 height = 24
 command = ["node", "--disable-warning=ExperimentalWarning", "src/stats.ts"]
+
+[[actions]]
+id = "demo"
+title = "Play Typing Madness Meter demo"
+contexts = ["global", "workspace", "tab", "pane"]
+command = ["node", "--disable-warning=ExperimentalWarning", "src/actions/demo.ts"]
+
+[[panes]]
+id = "demo"
+title = "Typing Madness Meter · demo"
+placement = "tab"
+command = ["node", "--disable-warning=ExperimentalWarning", "src/demo-typer.ts"]
