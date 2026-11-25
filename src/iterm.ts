@@ -2,13 +2,20 @@
 // Optional: if the Python env isn't built or herdr isn't inside iTerm2, every
 // method is a no-op.
 
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import type { ChildProcess } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import readline from "node:readline";
 
 type RGB = [number, number, number];
+
+/** How often to check whether iTerm2 is back after the bridge exits. */
+const RESTART_MS = 3000;
+
+function itermRunning(): boolean {
+  return spawnSync("pgrep", ["-xq", "iTerm2"]).status === 0;
+}
 
 export function pluginRoot(): string {
   return process.env.HERDR_PLUGIN_ROOT ?? path.resolve(import.meta.dirname, "..");
@@ -19,12 +26,31 @@ export class ItermBridge {
   private ready = false;
   private lastTint = "";
   private lastTintAt = 0;
+  private stopped = false;
+  private restartTimer: NodeJS.Timeout | null = null;
   sessions = 0;
 
+  /**
+   * Starts the bridge, and keeps restarting it whenever it exits (iTerm2
+   * quit or restarted) until stop(). The bridge only runs while iTerm2 does,
+   * so the HUD never launches iTerm2 itself.
+   */
   start(): boolean {
     const python = path.join(pluginRoot(), "bin", "pyenv", "bin", "python");
     const script = path.join(pluginRoot(), "iterm", "bridge.py");
     if (!fs.existsSync(python) || !fs.existsSync(script)) return false;
+    this.stopped = false;
+    this.spawnWhenIterm(python, script);
+    return true;
+  }
+
+  private spawnWhenIterm(python: string, script: string) {
+    this.restartTimer = null;
+    if (this.stopped) return;
+    if (!itermRunning()) {
+      this.restartTimer = setTimeout(() => this.spawnWhenIterm(python, script), RESTART_MS);
+      return;
+    }
     // Own process group: when the HUD pane closes, herdr's hangup must not
     // kill the bridge before it restores the background. It exits on its own
     // right after, once it sees stdin close.
@@ -34,17 +60,21 @@ export class ItermBridge {
       try {
         const msg = JSON.parse(line);
         if (msg.status === "ready") {
+          // A fresh iTerm2 has no tint yet; let the next tint() resend it.
+          this.lastTint = "";
           this.ready = true;
           this.sessions = msg.sessions ?? 0;
         }
       } catch {}
     });
-    child.on("exit", () => {
+    const restart = () => {
+      if (this.child !== child) return;
       this.ready = false;
       this.child = null;
-    });
-    child.on("error", () => (this.child = null));
-    return true;
+      if (!this.stopped) this.restartTimer = setTimeout(() => this.spawnWhenIterm(python, script), RESTART_MS);
+    };
+    child.on("exit", restart);
+    child.on("error", restart);
   }
 
   private send(msg: object) {
@@ -73,6 +103,8 @@ export class ItermBridge {
 
   /** Closing stdin makes the bridge restore colors and badge, then exit. */
   stop() {
+    this.stopped = true;
+    if (this.restartTimer) clearTimeout(this.restartTimer);
     this.child?.stdin?.end();
   }
 }

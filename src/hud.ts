@@ -11,13 +11,14 @@ import { ItermBridge } from "./iterm.ts";
 import { FocusTracker } from "./focus.ts";
 import { Game, emptyStats } from "./game.ts";
 import type { GameEvent, KeyClass } from "./game.ts";
-import { call, exportLayout, notify, paneLayout, setSplitRatio } from "./herdr.ts";
-import { Jiggler, findParentSplit, findSiblingPane } from "./jiggle.ts";
+import { call, exportLayout, listPanes, notify, paneLayout, setSplitRatio } from "./herdr.ts";
+import type { HerdrEvent } from "./herdr.ts";
+import { Jiggler, findAnchorPane, findParentSplit } from "./jiggle.ts";
 import { startKeytap } from "./keytap.ts";
 import type { TapStatus } from "./keytap.ts";
 import { DIM, fg, renderFrame } from "./render.ts";
 import type { Line } from "./render.ts";
-import { loadHudPaneId, loadStats, saveHudPaneId as storeHudPaneId, saveStats as storeStats } from "./store.ts";
+import { loadHud, loadStats, saveHud, saveStats as storeStats } from "./store.ts";
 import { startDemoFeed } from "./demo-feed.ts";
 import type { Stats } from "./game.ts";
 
@@ -28,8 +29,13 @@ const DEMO = process.env.TMM_DEMO === "1";
 const saveStats = (stats: Stats) => {
   if (!DEMO) storeStats(stats);
 };
-const saveHudPaneId = (paneId: string | null) => {
-  if (!DEMO) storeHudPaneId(paneId);
+/** Record where the HUD lives, so the toggle and the reopen hook can find it. */
+const saveHome = () => {
+  if (!DEMO && selfPane) saveHud({ pane_id: selfPane, tab_id: selfTab, workspace_id: selfWorkspace });
+};
+/** Forget the HUD: it was closed on purpose and should stay closed. */
+const forgetHome = () => {
+  if (!DEMO && selfPane && loadHud()?.pane_id === selfPane) saveHud(null);
 };
 /** Fresh demo stats, a few XP short of level 3 so a level-up shows early. */
 function demoStats(): Stats {
@@ -59,6 +65,7 @@ let tintTier = 0;
 // is updated after every follow.
 let selfPane = process.env.HERDR_PANE_ID ?? null;
 let selfTab: string | null = null;
+let selfWorkspace: string | null = process.env.HERDR_WORKSPACE_ID ?? null;
 /** The pane the HUD is split under; typing anywhere else makes it follow. */
 let anchorPane: string | null = null;
 
@@ -197,7 +204,7 @@ function statusLine(): Line | null {
     case "tap_failed":
       return [{ t: " ⚠ could not start the keyboard tap", s: fg(214, true) }];
     case "exited":
-      return [{ t: " ⚠ keytap helper stopped; reopen the HUD", s: fg(214, true) }];
+      return [{ t: " ⚠ keytap helper stopped; reopen the Typing Madness Meter", s: fg(214, true) }];
     default:
       return null;
   }
@@ -220,7 +227,7 @@ function draw() {
   let message = statusLine();
   if (!message && notice && notice.until > t) message = notice.line;
   if (!message && hudFocused()) {
-    message = [{ t: " HUD focused: keys typed here don't count (q closes the HUD)", s: DIM }];
+    message = [{ t: " Typing Madness Meter focused: keys typed here don't count (q closes it)", s: DIM }];
   }
 
   const out = renderFrame({
@@ -245,7 +252,7 @@ const FOLLOW_MIN_INTERVAL_MS = 800;
 
 interface MoveResult {
   changed: boolean;
-  pane: { pane_id: string; tab_id: string };
+  pane: { pane_id: string; tab_id: string; workspace_id?: string };
 }
 
 async function movePane(destination: object): Promise<MoveResult> {
@@ -258,6 +265,7 @@ async function movePane(destination: object): Promise<MoveResult> {
   if (result.changed) {
     selfPane = result.pane.pane_id;
     selfTab = result.pane.tab_id;
+    selfWorkspace = result.pane.workspace_id ?? selfWorkspace;
   }
   return result;
 }
@@ -266,7 +274,32 @@ async function movePane(destination: object): Promise<MoveResult> {
 async function refreshAnchor() {
   if (!selfTab || !selfPane) return;
   const { root } = await exportLayout(selfTab);
-  anchorPane = findSiblingPane(root, selfPane);
+  anchorPane = findAnchorPane(root, selfPane);
+}
+
+/**
+ * When the pane the HUD sits under closes, herdr hands its space to the HUD.
+ * Move under the pane that got focus instead; if that's the HUD itself (it was
+ * the last pane in the tab), the next keystroke elsewhere brings it along.
+ * Other layout changes (splits, moves, other panes closing) re-read the
+ * anchor so it stays right. A follow in progress sets the anchor itself.
+ */
+function onLayoutEvent(ev: HerdrEvent) {
+  if (ev.kind === "pane.closed" && anchorPane && ev.data?.pane_id === anchorPane) {
+    anchorPane = null;
+    void relocate();
+    return;
+  }
+  if (!following) void refreshAnchor().catch(() => {});
+}
+
+async function relocate() {
+  if (!cfg.follow || DEMO) return;
+  const target = (await listPanes().catch(() => [])).find((p) => p.focused);
+  if (target && target.pane_id !== selfPane) {
+    lastFollowAttempt = 0;
+    await follow(target);
+  }
 }
 
 /**
@@ -304,7 +337,7 @@ async function follow(target: { pane_id: string; tab_id: string; workspace_id: s
       if (!moved.changed) return;
     }
     anchorPane = target.pane_id;
-    saveHudPaneId(selfPane);
+    saveHome();
     lastFrame = "";
     await sizeSelf().catch(() => {});
   } catch {
@@ -330,13 +363,14 @@ async function sizeSelf() {
 let tap: ReturnType<typeof startKeytap> = null;
 let cleaned = false;
 
-function cleanup() {
+/** `keepHome`: herdr hung up on the HUD; leave the record for the close hooks. */
+function cleanup(keepHome = false) {
   if (cleaned) return;
   cleaned = true;
   try {
     saveStats(game.stats);
   } catch {}
-  if (selfPane && loadHudPaneId() === selfPane) saveHudPaneId(null);
+  if (!keepHome) forgetHome();
   accent?.restoreSync();
   iterm.stop();
   focus.stop();
@@ -345,15 +379,26 @@ function cleanup() {
   process.stdout.write("\x1b[0m\x1b[?25h\x1b[?1049l");
 }
 
-function exit() {
-  cleanup();
+function exit(keepHome = false) {
+  cleanup(keepHome);
   process.exit(0);
+}
+
+/**
+ * herdr hangs up on the HUD both when its own pane is closed and when its
+ * whole tab or workspace goes, and it can't answer questions while doing so.
+ * Keep the record either way: the pane.closed hook clears it when it was the
+ * HUD's own pane, and the tab.closed hook reopens the HUD otherwise.
+ */
+function onHangup() {
+  exit(true);
 }
 
 async function main() {
   process.stdout.write("\x1b[?1049h\x1b[?25l\x1b[2J");
-  for (const sig of ["SIGINT", "SIGTERM", "SIGHUP"] as const) process.on(sig, exit);
-  process.on("exit", cleanup);
+  process.on("SIGINT", () => exit());
+  for (const sig of ["SIGTERM", "SIGHUP"] as const) process.on(sig, onHangup);
+  process.on("exit", () => cleanup());
   process.stdout.on("resize", () => (lastFrame = ""));
 
   if (process.stdin.isTTY) {
@@ -365,11 +410,14 @@ async function main() {
   }
 
   if (selfPane) {
-    saveHudPaneId(selfPane);
-    selfTab = await call<{ pane: { tab_id: string } }>("pane.get", { pane_id: selfPane })
-      .then((r) => r.pane.tab_id)
-      .catch(() => process.env.HERDR_TAB_ID ?? null);
+    const pane = await call<{ pane: { tab_id: string; workspace_id: string } }>("pane.get", { pane_id: selfPane })
+      .then((r) => r.pane)
+      .catch(() => null);
+    selfTab = pane?.tab_id ?? process.env.HERDR_TAB_ID ?? null;
+    selfWorkspace = pane?.workspace_id ?? selfWorkspace;
+    saveHome();
   }
+  focus.onEvent = onLayoutEvent;
   await focus.start();
   void sizeSelf().catch(() => {});
   await refreshAnchor().catch(() => {});

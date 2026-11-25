@@ -2,7 +2,7 @@ id = "typing-madness-meter"
 name = "Typing Madness Meter"
 version = "0.1.0"
 min_herdr_version = "0.9.5"
-description = "Gamified typing for herdr: live WPM, combos, XP, achievements and a shaking HUD"
+description = "Gamified typing for herdr: live WPM, combos, XP, achievements and a shaking meter"
 platforms = ["macos"]
 
 [[build]]
@@ -51,3 +51,17 @@ id = "demo"
 title = "Typing Madness Meter · demo"
 placement = "tab"
 command = ["node", "--disable-warning=ExperimentalWarning", "src/demo-typer.ts"]
+
+# Closing a tab or workspace kills the meter with it: reopen it under the
+# pane that gets focus. Closing the meter's own pane switches it off.
+[[events]]
+on = "pane.closed"
+command = ["node", "--disable-warning=ExperimentalWarning", "src/hooks/closed.ts"]
+
+[[events]]
+on = "tab.closed"
+command = ["node", "--disable-warning=ExperimentalWarning", "src/hooks/closed.ts"]
+
+[[events]]
+on = "workspace.closed"
+command = ["node", "--disable-warning=ExperimentalWarning", "src/hooks/closed.ts"]

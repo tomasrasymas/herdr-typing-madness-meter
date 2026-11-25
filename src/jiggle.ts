@@ -47,15 +47,19 @@ export function findParentSplit(root: LayoutNode, paneId: string, area: Rect): S
 }
 
 /**
- * The pane `paneId` is attached to: its split sibling when that sibling is a
- * single pane, or null when it sits next to a nested split (or alone).
+ * The pane `paneId` hangs under: the single pane directly above it in a
+ * "down" split. Null when it sits beside a pane (a "right" split), above one,
+ * under a nested split, or alone. That happens when the pane it was under
+ * closes and herdr hands its space to the HUD.
  */
-export function findSiblingPane(root: LayoutNode, paneId: string): string | null {
+export function findAnchorPane(root: LayoutNode, paneId: string): string | null {
   if (root.type !== "split") return null;
   const { first, second } = root;
-  if (first.type === "pane" && first.pane_id === paneId) return second.type === "pane" ? (second.pane_id ?? null) : null;
-  if (second.type === "pane" && second.pane_id === paneId) return first.type === "pane" ? (first.pane_id ?? null) : null;
-  return findSiblingPane(first, paneId) ?? findSiblingPane(second, paneId);
+  if (second.type === "pane" && second.pane_id === paneId) {
+    return root.direction === "down" && first.type === "pane" ? (first.pane_id ?? null) : null;
+  }
+  if (first.type === "pane" && first.pane_id === paneId) return null;
+  return findAnchorPane(first, paneId) ?? findAnchorPane(second, paneId);
 }
 
 /** Ratios to step through: +1 cell, -1 cell, +half cell, original. */

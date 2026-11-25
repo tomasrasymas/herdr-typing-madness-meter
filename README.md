@@ -2,11 +2,11 @@
 
 A [herdr](https://herdr.dev) plugin that measures how mad your typing gets and turns it into a game.
 
-![Typing Madness Meter demo: the pane border goes from green to red as typing speeds up, while the HUD shows WPM, combo and XP, and combo badges flash](docs/demo.gif)
+![Typing Madness Meter demo: the pane border goes from green to red as typing speeds up, while the Typing Madness Meter shows WPM, combo and XP, and combo badges flash](docs/demo.gif)
 
 *The built-in demo (`typing-madness-meter.demo`) in iTerm2: speed colors, combo flashes and badges, a level-up and achievements. [Full-quality MP4](docs/demo.mp4).*
 
-- **HUD:** a small pane under the one you type in shows live WPM, combo, multiplier, accuracy, XP and level. Sparks fly after the text, and the HUD shakes harder the faster you type.
+- **Typing Madness Meter:** a small pane under the one you type in shows live WPM, combo, multiplier, accuracy, XP and level. Sparks fly after the text, and the meter shakes harder the faster you type.
 - **Speed colors:** the border of the pane you're typing in turns green, then yellow, orange and red as your WPM climbs. Inside iTerm2, the herdr window's background also warms up with your speed.
 - **Milestones:** every 25-key combo, level-up and new WPM record wiggles the typed pane's border. Inside iTerm2 it also flashes the background and shows a shaking badge (`COMBO 150!`). Level-ups, records and achievements pop a toast.
 - **Live badge:** while you type, the pane's border title shows `87 wpm · 120 combo`.
@@ -32,7 +32,7 @@ herdr shows you the plugin's source and build commands before installing. The bu
 - Compiles the key counter.
 - If iTerm2 and python3 are present, creates a private Python environment for the iTerm2 effects in the plugin folder.
 
-Then open the HUD:
+Then open the Typing Madness Meter:
 
 ```sh
 herdr plugin action invoke typing-madness-meter.toggle
@@ -40,10 +40,10 @@ herdr plugin action invoke typing-madness-meter.toggle
 
 ### Allow key counting
 
-The first time, macOS may ask for **Input Monitoring**. If the HUD shows a ⚠ permission message:
+The first time, macOS may ask for **Input Monitoring**. If the Typing Madness Meter shows a ⚠ permission message:
 1. Open System Settings › Privacy & Security › Input Monitoring.
 2. Enable your terminal app (iTerm2, Ghostty, …).
-3. Close and reopen the HUD.
+3. Close and reopen the Typing Madness Meter.
 
 macOS credits the permission to the terminal that runs herdr, not to the plugin.
 
@@ -56,7 +56,7 @@ Add these to `~/.config/herdr/config.toml`, then run `herdr server reload-config
 key = "prefix+t"
 type = "plugin_action"
 command = "typing-madness-meter.toggle"
-description = "typing HUD"
+description = "Typing Madness Meter"
 
 [[keys.command]]
 key = "prefix+T"
@@ -78,14 +78,15 @@ Your stats and config are kept across updates and reinstalls.
 
 | Action | What it does |
 |---|---|
-| `typing-madness-meter.toggle` | Opens the HUD (the "Typing Madness Meter" pane) under the focused pane, or closes it. |
+| `typing-madness-meter.toggle` | Opens the Typing Madness Meter pane under the focused pane, or closes it. |
 | `typing-madness-meter.stats` | Opens a popup with your level, bests, streak, a 14-day chart and achievements. Any key closes it. |
 | `typing-madness-meter.reset` | Clears all stats. |
-| `typing-madness-meter.demo` | Plays a 35-second demo in a new tab. A fake editor types by itself while a demo HUD shows every effect. It uses throwaway stats, never touches your real ones, and returns you to your tab when it ends. |
+| `typing-madness-meter.demo` | Plays a 35-second demo in a new tab. A fake editor types by itself while a demo Typing Madness Meter shows every effect. It uses throwaway stats, never touches your real ones, and returns you to your tab when it ends. |
 
-- Keys count toward whichever herdr pane has focus. Keys typed while the HUD itself is focused don't count.
-- Press `q` in the HUD to close it.
-- **The HUD follows you.** When you start typing in another pane, it moves under that pane without taking focus. That works in the same tab, another tab or another workspace. It moves when you type, not when you switch, so clicking around doesn't rearrange anything.
+- Keys count toward whichever herdr pane has focus. Keys typed while the Typing Madness Meter itself is focused don't count.
+- Press `q` in the Typing Madness Meter to close it.
+- **The Typing Madness Meter follows you.** When you start typing in another pane, it moves under that pane without taking focus. That works in the same tab, another tab or another workspace. It moves when you type, not when you switch, so clicking around doesn't rearrange anything.
+- **It stays on until you turn it off.** If the pane it sits under closes, it moves under the pane that gets focus. If its whole tab or workspace closes, it reopens under the pane you land on. Only `q`, the toggle action or closing the meter's own pane switches it off.
 
 ## Levels and ranks
 
@@ -132,7 +133,7 @@ All settings are optional. Create `config.json` in the plugin's config folder:
 open "$(herdr plugin config-dir typing-madness-meter)"
 ```
 
-Settings are read when the HUD starts. Toggle the HUD off and on after changing them. Leave out any key to keep its default.
+Settings are read when the Typing Madness Meter starts. Toggle it off and on after changing them. Leave out any key to keep its default.
 
 ### Speed colors
 
@@ -148,7 +149,7 @@ Settings are read when the HUD starts. Toggle the HUD off and on after changing 
 | Key | Default | Meaning |
 |---|---|---|
 | `tierWpm` | `[25, 45, 65, 85]` | Minimum WPM for each of the four speed tiers. Must be four increasing numbers. Lower them to see colors sooner, raise them to make red harder to reach. |
-| `tierColors` | green, yellow, orange, red | Hex colors (`#rrggbb`) for those four tiers. Used for the pane border, the iTerm2 tint and the HUD's WPM number. Below the first tier, nothing is colored. |
+| `tierColors` | green, yellow, orange, red | Hex colors (`#rrggbb`) for those four tiers. Used for the pane border, the iTerm2 tint and the meter's WPM number. Below the first tier, nothing is colored. |
 | `borderColor` | `true` | Color the border of the pane you're typing in. |
 | `itermTint` | `true` | iTerm2 only. Tint the herdr window's background toward the tier color. It gets stronger the faster you type. |
 
@@ -191,20 +192,20 @@ Changing the scoring rules doesn't recalculate XP you've already earned.
 | `itermBadge` | `true` | iTerm2 only. Show a shaking badge (`COMBO 150!`) on milestones. |
 | `badge` | `true` | Show `87 wpm · 120 combo` on the typed pane's border title. |
 | `toasts` | `true` | Toast on level-ups, records and achievements. |
-| `follow` | `true` | Move the HUD under whichever pane you start typing in. |
-| `hudHeight` | `6` | HUD height in rows. |
+| `follow` | `true` | Move the Typing Madness Meter under whichever pane you start typing in. |
+| `hudHeight` | `6` | Typing Madness Meter pane height in rows. |
 | `terminals` | built-in list | Bundle ids of terminal apps whose keys count. By default: iTerm2, Ghostty, Terminal, WezTerm, kitty, Alacritty and Warp. |
 | `allowAnyApp` | `false` | Count keys no matter which app is frontmost. |
 
 ## How the effects work, and what they touch
 
-- **Border color:** herdr has no API for changing colors at runtime. To color the focused pane's border, the HUD temporarily adds a line ending in `# typing-madness-meter` under `[ui]` in your herdr `config.toml`, then reloads the config.
+- **Border color:** herdr has no API for changing colors at runtime. To color the focused pane's border, the Typing Madness Meter temporarily adds a line ending in `# typing-madness-meter` under `[ui]` in your herdr `config.toml`, then reloads the config.
   - A reload takes about 50ms and happens at most once every 0.8s, only when your speed tier changes.
   - If you already set `accent` there, it is commented out as `# typing-madness-meter-off: …` and restored exactly.
-  - The line is removed again 3 seconds after you stop typing and when the HUD closes. If a crash leaves it behind, the next HUD start removes it.
+  - The line is removed again 3 seconds after you stop typing and when the Typing Madness Meter closes. If a crash leaves it behind, the next start removes it.
   - Set `"borderColor": false` and the plugin never touches the file.
-- **iTerm2 effects:** these only change the current session's colors and badge, never your saved profile. When the HUD closes, the bridge (`iterm/bridge.py`) restores everything from the saved profile.
-- **Shake:** herdr can't move panes, so the HUD shakes its own content. The typed pane's border wiggles one cell for about 160ms, which briefly resizes that pane. A pane alone in its tab has no border to wiggle.
+- **iTerm2 effects:** these only change the current session's colors and badge, never your saved profile. When the Typing Madness Meter closes, the bridge (`iterm/bridge.py`) restores everything from the saved profile.
+- **Shake:** herdr can't move panes, so the Typing Madness Meter shakes its own content. The typed pane's border wiggles one cell for about 160ms, which briefly resizes that pane. A pane alone in its tab has no border to wiggle.
 
 ## Privacy
 
@@ -230,7 +231,7 @@ npm test           # node --test, no herdr needed
 npm run typecheck
 ```
 
-`src/hud.ts` is the long-running process. It owns the key counter, the iTerm2 bridge, the herdr event subscription and the game state, and everything stops when the HUD pane closes. `src/game.ts`, `src/tiers.ts`, `src/jiggle.ts`, `src/accent.ts` and `src/render.ts` hold the logic and are unit-tested.
+`src/hud.ts` is the long-running process. It owns the key counter, the iTerm2 bridge, the herdr event subscription and the game state, and everything stops when the Typing Madness Meter pane closes. `src/hooks/closed.ts` is an event hook: it reopens the meter when herdr closes the tab or workspace it was in, and forgets it when its own pane is closed. `src/game.ts`, `src/tiers.ts`, `src/jiggle.ts`, `src/accent.ts` and `src/render.ts` hold the logic and are unit-tested.
 
 Notes on herdr 0.9.5's API that shaped the design:
 

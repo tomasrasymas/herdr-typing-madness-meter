@@ -3,7 +3,7 @@
 // poll as a safety net for missed events.
 
 import { listPanes, subscribe } from "./herdr.ts";
-import type { PaneInfo, Subscription } from "./herdr.ts";
+import type { HerdrEvent, PaneInfo, Subscription } from "./herdr.ts";
 
 const EVENTS = [
   "pane.focused",
@@ -18,6 +18,8 @@ const EVENTS = [
 
 export class FocusTracker {
   focused: PaneInfo | null = null;
+  /** Called for every subscribed event, after focus starts refreshing. */
+  onEvent: ((ev: HerdrEvent) => void) | null = null;
   private sub: Subscription | null = null;
   private poll: NodeJS.Timeout | null = null;
   private refreshing = false;
@@ -40,7 +42,10 @@ export class FocusTracker {
     if (this.stopped) return;
     this.sub = subscribe(
       EVENTS,
-      () => void this.refresh(),
+      (ev) => {
+        void this.refresh();
+        this.onEvent?.(ev);
+      },
       () => {
         // Stream ended (events_lost, server restart): reconnect and re-read.
         if (this.stopped) return;

@@ -203,7 +203,16 @@ async def main(connection):
             except Exception:
                 pass
 
+    async def exit_on_disconnect():
+        # The iterm2 library doesn't end main() when iTerm2 quits; the HUD
+        # restarts the bridge once iTerm2 is back, so just go.
+        await connection.websocket.wait_closed()
+        emit({"status": "error", "error": "iTerm2 connection closed"})
+        sys.stdout.flush()
+        os._exit(2)
+
     rescan = asyncio.ensure_future(rescan_forever())
+    watcher = asyncio.ensure_future(exit_on_disconnect())
     reader = await read_stdin()
     try:
         while True:
@@ -216,6 +225,7 @@ async def main(connection):
                 emit({"status": "warn", "error": str(e)})
     finally:
         rescan.cancel()
+        watcher.cancel()
         await bridge.restore_all()
         # The restore calls above have completed. Exit now instead of waiting
         # several seconds for the iterm2 library to close its websocket.

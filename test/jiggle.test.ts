@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { LayoutNode } from "../src/herdr.ts";
-import { findParentSplit, findSiblingPane, jiggleFrames } from "../src/jiggle.ts";
+import { findAnchorPane, findParentSplit, jiggleFrames } from "../src/jiggle.ts";
 
 const area = { x: 0, y: 0, width: 200, height: 50 };
 
@@ -58,13 +58,42 @@ test("lone pane and unknown pane have no split", () => {
   assert.equal(findParentSplit(tree, "w9:p9", area), null);
 });
 
-test("sibling pane is the HUD's anchor", () => {
-  assert.equal(findSiblingPane(tree, "w1:p3"), "w1:p4");
-  assert.equal(findSiblingPane(tree, "w1:p4"), "w1:p3");
-  // p2's sibling is a nested split, not a single pane
-  assert.equal(findSiblingPane(tree, "w1:p2"), null);
-  assert.equal(findSiblingPane(tree, "w1:p1"), null);
-  assert.equal(findSiblingPane({ type: "pane", pane_id: "w1:p1" }, "w1:p1"), null);
+test("anchor is the single pane directly above", () => {
+  // [ p1 / hud ]
+  const under: LayoutNode = {
+    type: "split",
+    direction: "down",
+    ratio: 0.9,
+    first: { type: "pane", pane_id: "w1:p1" },
+    second: { type: "pane", pane_id: "w1:hud" },
+  };
+  assert.equal(findAnchorPane(under, "w1:hud"), "w1:p1");
+  // nested: [ p1 | [ p2 / hud ] ]
+  assert.equal(
+    findAnchorPane({ type: "split", direction: "right", ratio: 0.5, first: { type: "pane", pane_id: "w1:p1" }, second: under }, "w1:hud"),
+    "w1:p1",
+  );
+});
+
+test("no anchor beside, above, under a split, or alone", () => {
+  // The pane the HUD was under closed: [ p1 | hud ] leaves it full height.
+  const beside: LayoutNode = {
+    type: "split",
+    direction: "right",
+    ratio: 0.5,
+    first: { type: "pane", pane_id: "w1:p1" },
+    second: { type: "pane", pane_id: "w1:hud" },
+  };
+  assert.equal(findAnchorPane(beside, "w1:hud"), null);
+  // [ hud / p1 ]
+  assert.equal(
+    findAnchorPane({ type: "split", direction: "down", ratio: 0.5, first: { type: "pane", pane_id: "w1:hud" }, second: { type: "pane", pane_id: "w1:p1" } }, "w1:hud"),
+    null,
+  );
+  // p3 sits under a nested split in the shared tree, p2 above one
+  assert.equal(findAnchorPane(tree, "w1:p4"), null);
+  assert.equal(findAnchorPane(tree, "w1:p2"), null);
+  assert.equal(findAnchorPane({ type: "pane", pane_id: "w1:hud" }, "w1:hud"), null);
 });
 
 test("frames wiggle one cell and end on the original ratio", () => {
