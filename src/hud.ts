@@ -12,7 +12,7 @@ import { FocusTracker } from "./focus.ts";
 import { Game, emptyStats } from "./game.ts";
 import type { GameEvent, KeyClass } from "./game.ts";
 import { call, exportLayout, notify, paneLayout, setSplitRatio } from "./herdr.ts";
-import { Jiggler, findParentSplit } from "./jiggle.ts";
+import { Jiggler, findParentSplit, findSiblingPane } from "./jiggle.ts";
 import { startKeytap } from "./keytap.ts";
 import type { TapStatus } from "./keytap.ts";
 import { DIM, fg, renderFrame } from "./render.ts";
@@ -42,6 +42,8 @@ let tintTier = 0;
 // is updated after every follow.
 let selfPane = process.env.HERDR_PANE_ID ?? null;
 let selfTab: string | null = null;
+/** The pane the HUD is split under; typing anywhere else makes it follow. */
+let anchorPane: string | null = null;
 
 let tapStatus: TapStatus = "starting";
 let notice: { line: Line; until: number } | null = null;
@@ -62,7 +64,7 @@ function onKey(cls: KeyClass, t: number) {
   const target = focus.focused;
   if (!target || hudFocused()) return;
   typedPane = target.pane_id;
-  if (cfg.follow && selfTab && target.tab_id !== selfTab) void follow(target.pane_id, target.tab_id);
+  if (cfg.follow && selfTab && target.pane_id !== anchorPane) void follow(target);
   handle(game.key(cls, t), target.pane_id);
   scheduleSave();
   if (cls === "char" || cls === "enter") maybeBadge(target.pane_id, t);
@@ -222,43 +224,77 @@ function draw() {
 
 let following = false;
 let lastFollowAttempt = 0;
-const FOLLOW_RETRY_MS = 3000;
-
-/**
- * Move the HUD under the pane being typed in when that pane is in another
- * tab. Triggered by typing rather than focus, so browsing workspaces doesn't
- * reshuffle layouts.
- */
-async function follow(paneId: string, tabId: string) {
-  const now = Date.now();
-  if (!selfPane || following || now - lastFollowAttempt < FOLLOW_RETRY_MS) return;
-  following = true;
-  lastFollowAttempt = now;
-  try {
-    const r = await call<{
-      move_result?: MoveResult;
-    } & MoveResult>("pane.move", {
-      pane_id: selfPane,
-      destination: { type: "tab", tab_id: tabId, target_pane_id: paneId, split: "down" },
-      focus: false,
-    });
-    const result = r.move_result ?? r;
-    if (!result.changed) return; // zoomed tab or same tab: retry after the cooldown
-    selfPane = result.pane.pane_id;
-    selfTab = result.pane.tab_id;
-    saveHudPaneId(selfPane);
-    lastFrame = "";
-    await sizeSelf().catch(() => {});
-  } catch {
-    // Leave the HUD where it is; the next keystroke after the cooldown retries.
-  } finally {
-    following = false;
-  }
-}
+const FOLLOW_MIN_INTERVAL_MS = 800;
 
 interface MoveResult {
   changed: boolean;
   pane: { pane_id: string; tab_id: string };
+}
+
+async function movePane(destination: object): Promise<MoveResult> {
+  const r = await call<{ move_result?: MoveResult } & MoveResult>("pane.move", {
+    pane_id: selfPane,
+    destination,
+    focus: false,
+  });
+  const result = r.move_result ?? r;
+  if (result.changed) {
+    selfPane = result.pane.pane_id;
+    selfTab = result.pane.tab_id;
+  }
+  return result;
+}
+
+/** Re-read which pane the HUD sits under, from the live layout. */
+async function refreshAnchor() {
+  if (!selfTab || !selfPane) return;
+  const { root } = await exportLayout(selfTab);
+  anchorPane = findSiblingPane(root, selfPane);
+}
+
+/**
+ * Move the HUD under the pane being typed in when it isn't already there.
+ * Triggered by typing rather than focus, so browsing panes and workspaces
+ * doesn't reshuffle layouts.
+ *
+ * herdr refuses pane.move within one tab, so a same-tab follow parks the HUD
+ * in a temporary tab and moves it back under the target. The temporary tab
+ * closes by itself when the HUD leaves it, and focus never changes.
+ */
+async function follow(target: { pane_id: string; tab_id: string; workspace_id: string }) {
+  const now = Date.now();
+  if (!selfPane || following || now - lastFollowAttempt < FOLLOW_MIN_INTERVAL_MS) return;
+  following = true;
+  lastFollowAttempt = now;
+  const home = selfTab;
+  const into = { type: "tab", tab_id: target.tab_id, target_pane_id: target.pane_id, split: "down" };
+  try {
+    // The layout may have changed (e.g. the old anchor closed) since we
+    // last looked; skip the move if the HUD is already under the target.
+    await refreshAnchor().catch(() => {});
+    if (anchorPane === target.pane_id) return;
+    if (target.tab_id === selfTab) {
+      const out = await movePane({ type: "new_tab", workspace_id: target.workspace_id });
+      if (!out.changed) return; // zoomed tab: retry on a later keystroke
+      const back = await movePane(into).catch(() => null);
+      if (!back?.changed && home) {
+        // Couldn't land under the target: at least return to the original tab.
+        await movePane({ type: "tab", tab_id: home, split: "down" }).catch(() => {});
+        return;
+      }
+    } else {
+      const moved = await movePane(into);
+      if (!moved.changed) return;
+    }
+    anchorPane = target.pane_id;
+    saveHudPaneId(selfPane);
+    lastFrame = "";
+    await sizeSelf().catch(() => {});
+  } catch {
+    // Leave the HUD where it is; a later keystroke retries.
+  } finally {
+    following = false;
+  }
 }
 
 // ---------------------------------------------------------------- lifecycle
@@ -319,6 +355,7 @@ async function main() {
   }
   await focus.start();
   void sizeSelf().catch(() => {});
+  await refreshAnchor().catch(() => {});
   accent?.recover();
   if (cfg.itermTint || cfg.itermFlash || cfg.itermBadge) iterm.start();
 

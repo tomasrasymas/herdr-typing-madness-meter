@@ -10,31 +10,31 @@ command = ["sh", "scripts/build.sh"]
 
 [[actions]]
 id = "toggle"
-title = "Toggle typing HUD"
+title = "Toggle Typing Madness Meter"
 contexts = ["global", "workspace", "tab", "pane"]
 command = ["node", "--disable-warning=ExperimentalWarning", "src/actions/toggle.ts"]
 
 [[actions]]
 id = "stats"
-title = "Show typing stats"
+title = "Show Typing Madness Meter stats"
 contexts = ["global", "workspace", "tab", "pane"]
 command = ["node", "--disable-warning=ExperimentalWarning", "src/actions/stats.ts"]
 
 [[actions]]
 id = "reset"
-title = "Reset typing stats"
+title = "Reset Typing Madness Meter stats"
 contexts = ["global"]
 command = ["node", "--disable-warning=ExperimentalWarning", "src/actions/reset.ts"]
 
 [[panes]]
 id = "hud"
-title = "Typing HUD"
+title = "Typing Madness Meter"
 placement = "split"
 command = ["node", "--disable-warning=ExperimentalWarning", "src/hud.ts"]
 
 [[panes]]
 id = "stats"
-title = "Typing stats"
+title = "Typing Madness Meter · stats"
 placement = "popup"
 width = "70%"
 height = 24

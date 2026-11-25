@@ -80,13 +80,13 @@ Your stats and config are kept across updates and reinstalls.
 
 | Action | What it does |
 |---|---|
-| `typing-madness-meter.toggle` | Opens the HUD under the focused pane, or closes it. |
+| `typing-madness-meter.toggle` | Opens the HUD (the "Typing Madness Meter" pane) under the focused pane, or closes it. |
 | `typing-madness-meter.stats` | Opens a popup with your level, bests, streak, a 14-day chart and achievements. Any key closes it. |
 | `typing-madness-meter.reset` | Clears all stats. |
 
 - Keys count toward whichever herdr pane has focus. Keys typed while the HUD itself is focused don't count.
 - Press `q` in the HUD to close it.
-- **The HUD follows you.** When you start typing in another tab or workspace, it moves under the pane you're typing in, without taking focus. It moves when you type, not when you switch, so browsing workspaces doesn't rearrange them.
+- **The HUD follows you.** When you start typing in another pane, it moves under that pane without taking focus. That works in the same tab, another tab or another workspace. It moves when you type, not when you switch, so clicking around doesn't rearrange anything.
 
 ## Levels and ranks
 
@@ -192,7 +192,7 @@ Changing the scoring rules doesn't recalculate XP you've already earned.
 | `itermBadge` | `true` | iTerm2 only. Show a shaking badge (`COMBO 150!`) on milestones. |
 | `badge` | `true` | Show `87 wpm · 120 combo` on the typed pane's border title. |
 | `toasts` | `true` | Toast on level-ups, records and achievements. |
-| `follow` | `true` | Move the HUD into whichever tab you start typing in. |
+| `follow` | `true` | Move the HUD under whichever pane you start typing in. |
 | `hudHeight` | `6` | HUD height in rows. |
 | `terminals` | built-in list | Bundle ids of terminal apps whose keys count. By default: iTerm2, Ghostty, Terminal, WezTerm, kitty, Alacritty and Warp. |
 | `allowAnyApp` | `false` | Count keys no matter which app is frontmost. |

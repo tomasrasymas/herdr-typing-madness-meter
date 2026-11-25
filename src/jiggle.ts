@@ -46,6 +46,18 @@ export function findParentSplit(root: LayoutNode, paneId: string, area: Rect): S
   return walk(root, area, []);
 }
 
+/**
+ * The pane `paneId` is attached to: its split sibling when that sibling is a
+ * single pane, or null when it sits next to a nested split (or alone).
+ */
+export function findSiblingPane(root: LayoutNode, paneId: string): string | null {
+  if (root.type !== "split") return null;
+  const { first, second } = root;
+  if (first.type === "pane" && first.pane_id === paneId) return second.type === "pane" ? (second.pane_id ?? null) : null;
+  if (second.type === "pane" && second.pane_id === paneId) return first.type === "pane" ? (first.pane_id ?? null) : null;
+  return findSiblingPane(first, paneId) ?? findSiblingPane(second, paneId);
+}
+
 /** Ratios to step through: +1 cell, -1 cell, +half cell, original. */
 export function jiggleFrames(target: SplitTarget, cells = 1): number[] {
   const d = cells / Math.max(1, target.extent);

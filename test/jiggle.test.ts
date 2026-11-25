@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { LayoutNode } from "../src/herdr.ts";
-import { findParentSplit, jiggleFrames } from "../src/jiggle.ts";
+import { findParentSplit, findSiblingPane, jiggleFrames } from "../src/jiggle.ts";
 
 const area = { x: 0, y: 0, width: 200, height: 50 };
 
@@ -56,6 +56,15 @@ test("nested panes resolve to their innermost split with extents", () => {
 test("lone pane and unknown pane have no split", () => {
   assert.equal(findParentSplit({ type: "pane", pane_id: "w1:p1" }, "w1:p1", area), null);
   assert.equal(findParentSplit(tree, "w9:p9", area), null);
+});
+
+test("sibling pane is the HUD's anchor", () => {
+  assert.equal(findSiblingPane(tree, "w1:p3"), "w1:p4");
+  assert.equal(findSiblingPane(tree, "w1:p4"), "w1:p3");
+  // p2's sibling is a nested split, not a single pane
+  assert.equal(findSiblingPane(tree, "w1:p2"), null);
+  assert.equal(findSiblingPane(tree, "w1:p1"), null);
+  assert.equal(findSiblingPane({ type: "pane", pane_id: "w1:p1" }, "w1:p1"), null);
 });
 
 test("frames wiggle one cell and end on the original ratio", () => {
