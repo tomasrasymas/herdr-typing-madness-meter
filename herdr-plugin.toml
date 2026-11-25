@@ -1,0 +1,41 @@
+id = "typing-madness-meter"
+name = "Typing Madness Meter"
+version = "0.1.0"
+min_herdr_version = "0.9.5"
+description = "Gamified typing for herdr: live WPM, combos, XP, achievements and a shaking HUD"
+platforms = ["macos"]
+
+[[build]]
+command = ["sh", "scripts/build.sh"]
+
+[[actions]]
+id = "toggle"
+title = "Toggle typing HUD"
+contexts = ["global", "workspace", "tab", "pane"]
+command = ["node", "--disable-warning=ExperimentalWarning", "src/actions/toggle.ts"]
+
+[[actions]]
+id = "stats"
+title = "Show typing stats"
+contexts = ["global", "workspace", "tab", "pane"]
+command = ["node", "--disable-warning=ExperimentalWarning", "src/actions/stats.ts"]
+
+[[actions]]
+id = "reset"
+title = "Reset typing stats"
+contexts = ["global"]
+command = ["node", "--disable-warning=ExperimentalWarning", "src/actions/reset.ts"]
+
+[[panes]]
+id = "hud"
+title = "Typing HUD"
+placement = "split"
+command = ["node", "--disable-warning=ExperimentalWarning", "src/hud.ts"]
+
+[[panes]]
+id = "stats"
+title = "Typing stats"
+placement = "popup"
+width = "70%"
+height = 24
+command = ["node", "--disable-warning=ExperimentalWarning", "src/stats.ts"]

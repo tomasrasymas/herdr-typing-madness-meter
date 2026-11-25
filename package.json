@@ -1,0 +1,19 @@
+{
+  "name": "herdr-typing-madness-meter",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Gamified typing plugin for herdr",
+  "type": "module",
+  "engines": {
+    "node": ">=23.6"
+  },
+  "scripts": {
+    "build": "sh scripts/build.sh",
+    "test": "node --disable-warning=ExperimentalWarning --test test/*.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "typescript": "^5.8.3"
+  }
+}
