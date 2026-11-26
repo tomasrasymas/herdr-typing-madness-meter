@@ -85,7 +85,7 @@ Your stats and config are kept across updates and reinstalls.
 
 - Keys count toward whichever herdr pane has focus. Keys typed while the Typing Madness Meter itself is focused don't count.
 - Press `q` in the Typing Madness Meter to close it.
-- **The Typing Madness Meter follows you.** When you start typing in another pane, it moves under that pane without taking focus. That works in the same tab, another tab or another workspace. It moves when you type, not when you switch, so clicking around doesn't rearrange anything.
+- **The Typing Madness Meter follows you.** When another pane gets focus (you click it or switch to it), the meter moves under that pane without taking focus. That works in the same tab, another tab or another workspace. Set `"followOn": "typing"` to move it only once you start typing there, so clicking around doesn't rearrange anything.
 - **It stays on until you turn it off.** If the pane it sits under closes, it moves under the pane that gets focus. If its whole tab or workspace closes, it reopens under the pane you land on. Only `q`, the toggle action or closing the meter's own pane switches it off.
 
 ## Levels and ranks
@@ -192,7 +192,8 @@ Changing the scoring rules doesn't recalculate XP you've already earned.
 | `itermBadge` | `true` | iTerm2 only. Show a shaking badge (`COMBO 150!`) on milestones. |
 | `badge` | `true` | Show `87 wpm · 120 combo` on the typed pane's border title. |
 | `toasts` | `true` | Toast on level-ups, records and achievements. |
-| `follow` | `true` | Move the Typing Madness Meter under whichever pane you start typing in. |
+| `follow` | `true` | Move the Typing Madness Meter under another pane. Set `false` to keep it where you opened it. |
+| `followOn` | `"focus"` | `"focus"`: move as soon as a pane gets focus. `"typing"`: move only when you start typing in it. |
 | `hudHeight` | `6` | Typing Madness Meter pane height in rows. |
 | `terminals` | built-in list | Bundle ids of terminal apps whose keys count. By default: iTerm2, Ghostty, Terminal, WezTerm, kitty, Alacritty and Warp. |
 | `allowAnyApp` | `false` | Count keys no matter which app is frontmost. |

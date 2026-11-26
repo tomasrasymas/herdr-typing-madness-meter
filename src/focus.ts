@@ -18,6 +18,8 @@ const EVENTS = [
 
 export class FocusTracker {
   focused: PaneInfo | null = null;
+  /** Called when the focused pane changes. */
+  onFocusChange: ((pane: PaneInfo | null) => void) | null = null;
   /** Called for every subscribed event, after focus starts refreshing. */
   onEvent: ((ev: HerdrEvent) => void) | null = null;
   private sub: Subscription | null = null;
@@ -68,7 +70,11 @@ export class FocusTracker {
       do {
         this.again = false;
         const panes = await listPanes().catch(() => null);
-        if (panes) this.focused = panes.find((p) => p.focused) ?? null;
+        if (panes) {
+          const before = this.focused?.pane_id;
+          this.focused = panes.find((p) => p.focused) ?? null;
+          if (this.focused?.pane_id !== before) this.onFocusChange?.(this.focused);
+        }
       } while (this.again);
     } finally {
       this.refreshing = false;

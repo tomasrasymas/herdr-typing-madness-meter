@@ -66,7 +66,7 @@ let tintTier = 0;
 let selfPane = process.env.HERDR_PANE_ID ?? null;
 let selfTab: string | null = null;
 let selfWorkspace: string | null = process.env.HERDR_WORKSPACE_ID ?? null;
-/** The pane the HUD is split under; typing anywhere else makes it follow. */
+/** The pane the HUD is split under; focusing or typing elsewhere makes it follow. */
 let anchorPane: string | null = null;
 
 let tapStatus: TapStatus = "starting";
@@ -249,6 +249,26 @@ function draw() {
 let following = false;
 let lastFollowAttempt = 0;
 const FOLLOW_MIN_INTERVAL_MS = 800;
+/** Wait for focus to settle, so clicking through panes moves the HUD once. */
+const FOCUS_SETTLE_MS = 150;
+let focusTimer: NodeJS.Timeout | null = null;
+
+/** followOn "focus": move under the focused pane once focus settles. */
+function followFocus(delay = FOCUS_SETTLE_MS) {
+  if (!cfg.follow || cfg.followOn !== "focus" || DEMO) return;
+  if (focusTimer) clearTimeout(focusTimer);
+  focusTimer = setTimeout(() => {
+    focusTimer = null;
+    const target = focus.focused;
+    if (!selfTab || !target || target.pane_id === selfPane || target.pane_id === anchorPane) return;
+    const wait = lastFollowAttempt + FOLLOW_MIN_INTERVAL_MS - Date.now();
+    if (following || wait > 0) return followFocus(Math.max(wait, FOCUS_SETTLE_MS));
+    void follow(target).then(() => {
+      // Focus moved on while we were moving: catch up.
+      if (focus.focused && focus.focused.pane_id !== target.pane_id) followFocus();
+    });
+  }, delay);
+}
 
 interface MoveResult {
   changed: boolean;
@@ -418,6 +438,7 @@ async function main() {
     saveHome();
   }
   focus.onEvent = onLayoutEvent;
+  focus.onFocusChange = () => followFocus();
   await focus.start();
   void sizeSelf().catch(() => {});
   await refreshAnchor().catch(() => {});
