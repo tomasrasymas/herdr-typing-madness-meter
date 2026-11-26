@@ -5,7 +5,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { AccentController } from "./accent.ts";
-import { setTierColors, setTierWpm, tierColor, tierFor, tintAmount } from "./tiers.ts";
+import { idleFade, setTierColors, setTierWpm, speedTier, tierColor, tintAmount } from "./tiers.ts";
 import { loadConfig, stateDir } from "./config.ts";
 import { ItermBridge } from "./iterm.ts";
 import { FocusTracker } from "./focus.ts";
@@ -61,7 +61,8 @@ const focus = new FocusTracker();
 const jiggler = new Jiggler({ cells: cfg.jiggleCells });
 const accent = cfg.borderColor ? new AccentController() : null;
 const iterm = new ItermBridge();
-let tintTier = 0;
+/** The speed tier every color shows: WPM number, border and tint. */
+let tier = 0;
 // The HUD's own pane. Cross-workspace moves assign a new public id, so this
 // is updated after every move.
 let selfPane = process.env.HERDR_PANE_ID ?? null;
@@ -181,12 +182,13 @@ function checkResetRequest() {
 
 // ---------------------------------------------------------------- speed colors
 
-/** Border color (herdr accent) and background tint (iTerm2) follow WPM. */
+/** Border color (herdr accent) and background tint (iTerm2) show the speed tier. */
 function speedColors(wpm: number, heat: number, idleMs: number) {
-  accent?.update(wpm, idleMs);
+  accent?.setTier(tier);
   if (!cfg.itermTint) return;
-  tintTier = idleMs > 3000 ? 0 : tierFor(wpm, tintTier);
-  iterm.tint(tierColor(tintTier).rgb, tintAmount(wpm, heat));
+  // Once you stop, the tint fades out over the last stretch before the tier
+  // (and with it the border) switches off.
+  iterm.tint(tierColor(tier).rgb, tintAmount(wpm, heat) * idleFade(idleMs));
 }
 
 // ---------------------------------------------------------------- rendering
@@ -216,6 +218,7 @@ function draw() {
   frame++;
 
   const live = game.live(t);
+  tier = speedTier(live.wpm, live.idleMs, tier);
   if (frame % 3 === 0) speedColors(live.wpm, live.heat, live.idleMs);
   const amp = Math.min(3, live.heat * 1.6 + burst);
   burst *= 0.88;
@@ -236,6 +239,7 @@ function draw() {
     width: process.stdout.columns || 80,
     height: process.stdout.rows || 6,
     frame: amp > 0.05 ? frame : 0,
+    tier,
   });
   if (out !== lastFrame) {
     process.stdout.write(out);

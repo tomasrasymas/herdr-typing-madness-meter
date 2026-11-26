@@ -205,7 +205,7 @@ Changing the scoring rules doesn't recalculate XP you've already earned.
 - **Border color:** herdr has no API for changing colors at runtime. To color the focused pane's border, the Typing Madness Meter temporarily adds a line ending in `# typing-madness-meter` under `[ui]` in your herdr `config.toml`, then reloads the config.
   - A reload takes about 50ms and happens at most once every 0.8s, only when your speed tier changes.
   - If you already set `accent` there, it is commented out as `# typing-madness-meter-off: …` and restored exactly.
-  - The line is removed again 3 seconds after you stop typing and when the Typing Madness Meter closes. If a crash leaves it behind, the next start removes it.
+  - The line is removed again 4 seconds after you stop typing and when the Typing Madness Meter closes. If a crash leaves it behind, the next start removes it.
   - Set `"borderColor": false` and the plugin never touches the file.
 - **iTerm2 effects:** these only change the current session's colors and badge, never your saved profile. When the Typing Madness Meter closes, the bridge (`iterm/bridge.py`) restores everything from the saved profile.
 - **Shake:** herdr can't move panes, so the Typing Madness Meter shakes its own content. The typed pane's border wiggles one cell for about 160ms, which briefly resizes that pane. A pane alone in its tab has no border to wiggle.

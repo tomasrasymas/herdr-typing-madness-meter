@@ -82,9 +82,9 @@ export class ItermBridge {
     this.child.stdin.write(JSON.stringify(msg) + "\n");
   }
 
-  /** Background tint; amount 0..1 is quantized and rate-limited to ~10/s. */
+  /** Background tint; amount 0..1 is quantized to 20 steps and rate-limited to ~10/s. */
   tint(rgb: RGB | null, amount: number) {
-    const q = rgb ? Math.round(Math.min(1, Math.max(0, amount)) * 10) / 10 : 0;
+    const q = rgb ? Math.round(Math.min(1, Math.max(0, amount)) * 20) / 20 : 0;
     const key = rgb && q > 0 ? `${rgb.join(",")}@${q}` : "off";
     const now = Date.now();
     if (key === this.lastTint || now - this.lastTintAt < 100) return;

@@ -70,6 +70,28 @@ export function tierFor(wpm: number, current: number, mins = tierWpm): number {
   return tier;
 }
 
+/** Speed colors (border and tint) switch off this long after the last key. */
+export const COLOR_IDLE_MS = 4000;
+/** The tint eases out over the last stretch of that, so it ends with the border. */
+export const TINT_FADE_MS = 2500;
+export const TINT_FADE_DELAY_MS = COLOR_IDLE_MS - TINT_FADE_MS;
+
+/** 1 while typing, easing smoothly to 0 once you stop. */
+export function idleFade(idleMs: number): number {
+  if (idleMs <= TINT_FADE_DELAY_MS) return 1;
+  const x = Math.min(1, (idleMs - TINT_FADE_DELAY_MS) / TINT_FADE_MS);
+  return 1 - x * x * (3 - 2 * x); // smoothstep, reversed
+}
+
+/**
+ * The one speed tier the HUD's WPM color, the border and the tint all show:
+ * it follows your speed (with hysteresis) and drops to 0 once you've been
+ * idle for COLOR_IDLE_MS.
+ */
+export function speedTier(wpm: number, idleMs: number, current: number): number {
+  return idleMs > COLOR_IDLE_MS ? 0 : tierFor(wpm, current);
+}
+
 /** How strong the background tint is: typing burst or sustained speed, whichever is higher. */
 export function tintAmount(wpm: number, heat: number, mins = tierWpm): number {
   return Math.min(1, Math.max(heat, wpm / mins[mins.length - 1]));

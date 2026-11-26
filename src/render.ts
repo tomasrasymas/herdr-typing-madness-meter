@@ -23,6 +23,8 @@ export interface HudView {
   height: number;
   /** Seed for the spark row, so frames differ while typing. */
   frame: number;
+  /** Speed tier for the WPM color, shared with the border and tint. Defaults to the raw WPM's tier. */
+  tier?: number;
 }
 
 const ESC = "\x1b[";
@@ -34,8 +36,9 @@ export function fg(n: number, bold = false): string {
 export const DIM = "2";
 
 /** SGR foreground for a WPM: gray below the first tier, else the tier's 24-bit color. */
-export function wpmStyle(wpm: number, bold = false): string {
-  const { rgb } = tierColor(tierIndex(wpm));
+/** Style for the WPM number and bar in a speed tier's color (grey for tier 0). */
+export function wpmStyle(tier: number, bold = false): string {
+  const { rgb } = tierColor(tier);
   const color = rgb ? `38;2;${rgb[0]};${rgb[1]};${rgb[2]}` : "38;5;250";
   return bold ? `1;${color}` : color;
 }
@@ -111,12 +114,13 @@ function withSparks(line: Line, heat: number, width: number, seed: number): Line
 export function hudLines(view: HudView): Line[] {
   const { live, width } = view;
   const wide = width >= 90;
-  const wpmS = wpmStyle(live.wpm);
+  const tier = view.tier ?? tierIndex(live.wpm);
+  const wpmS = wpmStyle(tier);
   const comboC = live.multiplier >= 4 ? 201 : live.multiplier >= 2.5 ? 208 : live.multiplier >= 1.5 ? 221 : 250;
 
   const wpmLine: Line = [
     { t: " " },
-    { t: String(live.wpm).padStart(3), s: wpmStyle(live.wpm, true) },
+    { t: String(live.wpm).padStart(3), s: wpmStyle(tier, true) },
     { t: " WPM ", s: wpmS },
     ...bar(live.wpm / 100, wide ? 20 : 10, wpmS),
     { t: ` peak ${live.sessionPeakWpm}`, s: DIM },

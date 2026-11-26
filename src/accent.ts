@@ -12,7 +12,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { call } from "./herdr.ts";
-import { tierColor, tierFor } from "./tiers.ts";
+import { tierColor } from "./tiers.ts";
 
 export const MARK = "# typing-madness-meter";
 export const OFF = "# typing-madness-meter-off: ";
@@ -72,10 +72,9 @@ export class AccentController {
     this.restoreSync();
   }
 
-  /** Call often; it only writes when the tier changes, at most every 800ms. */
-  update(wpm: number, idleMs: number) {
+  /** Call often with the current speed tier; writes only on change, at most every 800ms. */
+  setTier(target: number) {
     if (this.disabled) return;
-    const target = idleMs > 3000 ? 0 : tierFor(wpm, this.tier);
     if (target === this.tier) return;
     this.tier = target;
     this.schedule();
