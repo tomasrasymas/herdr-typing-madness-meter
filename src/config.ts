@@ -54,7 +54,7 @@ export const DEFAULT_CONFIG: Config = {
   itermTint: true,
   itermFlash: true,
   itermBadge: true,
-  hudHeight: 6,
+  hudHeight: 4,
   comboGapMs: 1200,
   comboMilestone: 25,
   tierWpm: [25, 45, 65, 85],

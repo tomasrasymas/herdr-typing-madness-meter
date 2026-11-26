@@ -196,7 +196,7 @@ Changing the scoring rules doesn't recalculate XP you've already earned.
 | `badge` | `true` | Show `87 wpm · 120 combo` on the typed pane's border title. |
 | `toasts` | `true` | Toast on level-ups, records and achievements. |
 | `follow` | `true` | Move the Typing Madness Meter to the bottom of whichever tab becomes active. Set `false` to keep it in the tab where you opened it. |
-| `hudHeight` | `6` | Typing Madness Meter pane height in rows. |
+| `hudHeight` | `4` | Typing Madness Meter pane height in rows. herdr never makes a split smaller than 10% of the tab's height, so in a tall window the meter can't go below that (7 rows in a 74-row tab). |
 | `terminals` | built-in list | Bundle ids of terminal apps whose keys count. By default: iTerm2, Ghostty, Terminal, WezTerm, kitty, Alacritty and Warp. |
 | `allowAnyApp` | `false` | Count keys no matter which app is frontmost. |
 

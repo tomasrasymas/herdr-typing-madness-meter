@@ -405,7 +405,8 @@ async function checkDocked() {
   const fullWidth = me.rect.x === snap.area.x && me.rect.width === snap.area.width;
   if (atBottom && fullWidth) {
     // A closed neighbor's space goes to the HUD: shrink back to size.
-    if (me.rect.height > cfg.hudHeight + 1) await sizeSelf().catch(() => {});
+    const smallest = Math.max(cfg.hudHeight, Math.ceil(snap.area.height * MIN_SHARE));
+    if (me.rect.height > smallest + 1) await sizeSelf().catch(() => {});
     return;
   }
   void dock(selfTab, selfWorkspace);
@@ -417,14 +418,17 @@ function onLayoutEvent(_ev: HerdrEvent) {
 
 // ---------------------------------------------------------------- lifecycle
 
-/** Shrink the HUD's split to cfg.hudHeight rows. */
+/** herdr keeps every split between 10% and 90%, so the HUD can't be smaller. */
+const MIN_SHARE = 0.1;
+
+/** Shrink the HUD's split to cfg.hudHeight rows (or herdr's 10% minimum). */
 async function sizeSelf() {
   if (!selfPane) return;
   const snap = await paneLayout(selfPane);
   const { root } = await exportLayout(snap.tab_id);
   const split = findParentSplit(root, selfPane, snap.area);
   if (!split || split.direction !== "down") return;
-  const share = Math.min(0.5, cfg.hudHeight / split.extent);
+  const share = Math.min(0.5, Math.max(MIN_SHARE, cfg.hudHeight / split.extent));
   await setSplitRatio(snap.tab_id, split.path, split.side ? 1 - share : share);
 }
 
