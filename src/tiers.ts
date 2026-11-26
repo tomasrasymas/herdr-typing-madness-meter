@@ -71,7 +71,7 @@ export function tierFor(wpm: number, current: number, mins = tierWpm): number {
 }
 
 /** Speed colors (border and tint) switch off this long after the last key. */
-export const COLOR_IDLE_MS = 4000;
+export const COLOR_IDLE_MS = 6000;
 /** The tint eases out over the last stretch of that, so it ends with the border. */
 export const TINT_FADE_MS = 2500;
 export const TINT_FADE_DELAY_MS = COLOR_IDLE_MS - TINT_FADE_MS;
