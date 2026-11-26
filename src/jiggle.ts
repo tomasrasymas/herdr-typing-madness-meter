@@ -47,19 +47,15 @@ export function findParentSplit(root: LayoutNode, paneId: string, area: Rect): S
 }
 
 /**
- * The pane `paneId` hangs under: the single pane directly above it in a
- * "down" split. Null when it sits beside a pane (a "right" split), above one,
- * under a nested split, or alone. That happens when the pane it was under
- * closes and herdr hands its space to the HUD.
+ * Where the HUD docks in a tab: the widest pane touching the tab's bottom
+ * edge (leftmost on a tie). herdr can only split inside a pane, so this gives
+ * a full-width strip whenever the bottom row is a single pane.
  */
-export function findAnchorPane(root: LayoutNode, paneId: string): string | null {
-  if (root.type !== "split") return null;
-  const { first, second } = root;
-  if (second.type === "pane" && second.pane_id === paneId) {
-    return root.direction === "down" && first.type === "pane" ? (first.pane_id ?? null) : null;
-  }
-  if (first.type === "pane" && first.pane_id === paneId) return null;
-  return findAnchorPane(first, paneId) ?? findAnchorPane(second, paneId);
+export function bottomPane(panes: { pane_id: string; rect: Rect }[], area: Rect): string | null {
+  const bottom = area.y + area.height;
+  const row = panes.filter((p) => p.rect.y + p.rect.height >= bottom);
+  row.sort((a, b) => b.rect.width - a.rect.width || a.rect.x - b.rect.x);
+  return row[0]?.pane_id ?? null;
 }
 
 /** Ratios to step through: +1 cell, -1 cell, +half cell, original. */

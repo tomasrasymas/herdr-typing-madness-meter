@@ -6,7 +6,7 @@ A [herdr](https://herdr.dev) plugin that measures how mad your typing gets and t
 
 *The built-in demo (`typing-madness-meter.demo`) in iTerm2: speed colors, combo flashes and badges, a level-up and achievements. [Full-quality MP4](docs/demo.mp4).*
 
-- **Typing Madness Meter:** a small pane under the one you type in shows live WPM, combo, multiplier, accuracy, XP and level. Sparks fly after the text, and the meter shakes harder the faster you type.
+- **Typing Madness Meter:** a small strip at the bottom of the active tab shows live WPM, combo, multiplier, accuracy, XP and level. Sparks fly after the text, and the meter shakes harder the faster you type.
 - **Speed colors:** the border of the pane you're typing in turns green, then yellow, orange and red as your WPM climbs. Inside iTerm2, the herdr window's background also warms up with your speed.
 - **Milestones:** every 25-key combo, level-up and new WPM record wiggles the typed pane's border. Inside iTerm2 it also flashes the background and shows a shaking badge (`COMBO 150!`). Level-ups, records and achievements pop a toast.
 - **Live badge:** while you type, the pane's border title shows `87 wpm · 120 combo`.
@@ -78,15 +78,18 @@ Your stats and config are kept across updates and reinstalls.
 
 | Action | What it does |
 |---|---|
-| `typing-madness-meter.toggle` | Opens the Typing Madness Meter pane under the focused pane, or closes it. |
+| `typing-madness-meter.toggle` | Opens the Typing Madness Meter at the bottom of the current tab, or closes it. |
 | `typing-madness-meter.stats` | Opens a popup with your level, bests, streak, a 14-day chart and achievements. Any key closes it. |
 | `typing-madness-meter.reset` | Clears all stats. |
 | `typing-madness-meter.demo` | Plays a 35-second demo in a new tab. A fake editor types by itself while a demo Typing Madness Meter shows every effect. It uses throwaway stats, never touches your real ones, and returns you to your tab when it ends. |
 
 - Keys count toward whichever herdr pane has focus. Keys typed while the Typing Madness Meter itself is focused don't count.
 - Press `q` in the Typing Madness Meter to close it.
-- **The Typing Madness Meter follows you.** When another pane gets focus (you click it or switch to it), the meter moves under that pane without taking focus. That works in the same tab, another tab or another workspace. Set `"followOn": "typing"` to move it only once you start typing there, so clicking around doesn't rearrange anything.
-- **It stays on until you turn it off.** If the pane it sits under closes, it moves under the pane that gets focus. If its whole tab or workspace closes, it reopens under the pane you land on. Only `q`, the toggle action or closing the meter's own pane switches it off.
+- **The Typing Madness Meter stays at the bottom of the active tab.** Switch to another tab or workspace and it moves to the bottom of that tab, without taking focus. Moving between panes inside a tab leaves it where it is.
+  - It always spans the full width. When you split a pane, the meter stays one strip under all of them.
+  - herdr can only split inside a pane, so in a tab with several panes the meter rebuilds the layout around itself. It moves the panes out and back into the same arrangement. Programs keep running, pane ids don't change, and focus stays on the pane you were in, but you may see the panes flicker for a moment.
+  - If a layout change pushes it away from the bottom, it moves back.
+- **It stays on until you turn it off.** If the pane it sits under closes, it moves back to the bottom. If its whole tab or workspace closes, it reopens at the bottom of the tab you land on. Only `q`, the toggle action or closing the meter's own pane switches it off.
 
 ## Levels and ranks
 
@@ -192,8 +195,7 @@ Changing the scoring rules doesn't recalculate XP you've already earned.
 | `itermBadge` | `true` | iTerm2 only. Show a shaking badge (`COMBO 150!`) on milestones. |
 | `badge` | `true` | Show `87 wpm · 120 combo` on the typed pane's border title. |
 | `toasts` | `true` | Toast on level-ups, records and achievements. |
-| `follow` | `true` | Move the Typing Madness Meter under another pane. Set `false` to keep it where you opened it. |
-| `followOn` | `"focus"` | `"focus"`: move as soon as a pane gets focus. `"typing"`: move only when you start typing in it. |
+| `follow` | `true` | Move the Typing Madness Meter to the bottom of whichever tab becomes active. Set `false` to keep it in the tab where you opened it. |
 | `hudHeight` | `6` | Typing Madness Meter pane height in rows. |
 | `terminals` | built-in list | Bundle ids of terminal apps whose keys count. By default: iTerm2, Ghostty, Terminal, WezTerm, kitty, Alacritty and Warp. |
 | `allowAnyApp` | `false` | Count keys no matter which app is frontmost. |

@@ -16,10 +16,8 @@ export interface Config {
   badge: boolean;
   /** Toast on achievements and level-ups. */
   toasts: boolean;
-  /** Move the HUD under another pane (see followOn). */
+  /** Move the HUD to the bottom of whichever tab becomes active. */
   follow: boolean;
-  /** "focus": move when a pane gets focus. "typing": move when you type in it. */
-  followOn: "focus" | "typing";
   /** Color the focused pane's border by WPM (rewrites herdr's ui.accent). */
   borderColor: boolean;
   /** iTerm2 only: tint the herdr window's background as you type faster. */
@@ -52,7 +50,6 @@ export const DEFAULT_CONFIG: Config = {
   badge: true,
   toasts: true,
   follow: true,
-  followOn: "focus",
   borderColor: true,
   itermTint: true,
   itermFlash: true,

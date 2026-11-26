@@ -1,7 +1,8 @@
 // Opening and probing the HUD pane, shared by the toggle action and the
 // reopen hook.
 
-import { call } from "./herdr.ts";
+import { call, paneLayout } from "./herdr.ts";
+import { bottomPane } from "./jiggle.ts";
 import { saveHud } from "./store.ts";
 import type { HudRecord } from "./store.ts";
 
@@ -22,8 +23,15 @@ interface OpenedPane {
   workspace_id?: string;
 }
 
-/** Open the HUD in a split under `target` without taking focus, and record it. */
+/** The pane at the bottom of `paneId`'s tab, where the HUD docks. */
+export async function dockTarget(paneId: string): Promise<string> {
+  const snap = await paneLayout(paneId).catch(() => null);
+  return (snap && bottomPane(snap.panes, snap.area)) ?? paneId;
+}
+
+/** Open the HUD at the bottom of `target`'s tab without taking focus, and record it. */
 export async function openHud(target: string): Promise<string> {
+  target = await dockTarget(target);
   const r = await call<{ plugin_pane: { pane: OpenedPane } }>("plugin.pane.open", {
     plugin_id: pluginId,
     entrypoint: "hud",

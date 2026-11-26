@@ -12,8 +12,9 @@ import { FocusTracker } from "./focus.ts";
 import { Game, emptyStats } from "./game.ts";
 import type { GameEvent, KeyClass } from "./game.ts";
 import { call, exportLayout, listPanes, notify, paneLayout, setSplitRatio } from "./herdr.ts";
-import type { HerdrEvent } from "./herdr.ts";
-import { Jiggler, findAnchorPane, findParentSplit } from "./jiggle.ts";
+import type { HerdrEvent, LayoutNode } from "./herdr.ts";
+import { Jiggler, bottomPane, findParentSplit } from "./jiggle.ts";
+import { leftmost, ratioPaths, rebuildMoves, withoutPane } from "./dock.ts";
 import { startKeytap } from "./keytap.ts";
 import type { TapStatus } from "./keytap.ts";
 import { DIM, fg, renderFrame } from "./render.ts";
@@ -62,12 +63,10 @@ const accent = cfg.borderColor ? new AccentController() : null;
 const iterm = new ItermBridge();
 let tintTier = 0;
 // The HUD's own pane. Cross-workspace moves assign a new public id, so this
-// is updated after every follow.
+// is updated after every move.
 let selfPane = process.env.HERDR_PANE_ID ?? null;
 let selfTab: string | null = null;
 let selfWorkspace: string | null = process.env.HERDR_WORKSPACE_ID ?? null;
-/** The pane the HUD is split under; focusing or typing elsewhere makes it follow. */
-let anchorPane: string | null = null;
 
 let tapStatus: TapStatus = "starting";
 let notice: { line: Line; until: number } | null = null;
@@ -88,7 +87,7 @@ function onKey(cls: KeyClass, t: number) {
   const target = focus.focused;
   if (!target || hudFocused()) return;
   typedPane = target.pane_id;
-  if (cfg.follow && !DEMO && selfTab && target.pane_id !== anchorPane) void follow(target);
+  if (cfg.follow && !DEMO && selfTab && target.tab_id !== selfTab) scheduleDock(0);
   handle(game.key(cls, t), target.pane_id);
   scheduleSave();
   if (cls === "char" || cls === "enter") maybeBadge(target.pane_id, t);
@@ -244,28 +243,34 @@ function draw() {
   }
 }
 
-// ---------------------------------------------------------------- follow
+// ---------------------------------------------------------------- docking
+//
+// The HUD lives at the bottom of the active tab. Switching tabs brings it
+// along; moving between panes inside a tab leaves it alone. If a layout change
+// leaves it somewhere else (its anchor closed, a split moved it up), it
+// re-docks at the bottom of its own tab.
 
-let following = false;
-let lastFollowAttempt = 0;
-const FOLLOW_MIN_INTERVAL_MS = 800;
-/** Wait for focus to settle, so clicking through panes moves the HUD once. */
+let docking = false;
+let lastDockAttempt = 0;
+const DOCK_MIN_INTERVAL_MS = 800;
+/** Wait for focus to settle, so flipping through tabs moves the HUD once. */
 const FOCUS_SETTLE_MS = 150;
-let focusTimer: NodeJS.Timeout | null = null;
+let dockTimer: NodeJS.Timeout | null = null;
 
-/** followOn "focus": move under the focused pane once focus settles. */
-function followFocus(delay = FOCUS_SETTLE_MS) {
-  if (!cfg.follow || cfg.followOn !== "focus" || DEMO) return;
-  if (focusTimer) clearTimeout(focusTimer);
-  focusTimer = setTimeout(() => {
-    focusTimer = null;
+/** Once focus settles, dock in the focused tab if that's not where the HUD is. */
+function scheduleDock(delay = FOCUS_SETTLE_MS) {
+  if (!cfg.follow || DEMO) return;
+  if (dockTimer) clearTimeout(dockTimer);
+  dockTimer = setTimeout(() => {
+    dockTimer = null;
     const target = focus.focused;
-    if (!selfTab || !target || target.pane_id === selfPane || target.pane_id === anchorPane) return;
-    const wait = lastFollowAttempt + FOLLOW_MIN_INTERVAL_MS - Date.now();
-    if (following || wait > 0) return followFocus(Math.max(wait, FOCUS_SETTLE_MS));
-    void follow(target).then(() => {
-      // Focus moved on while we were moving: catch up.
-      if (focus.focused && focus.focused.pane_id !== target.pane_id) followFocus();
+    if (!selfTab || !target || target.pane_id === selfPane || target.tab_id === selfTab) return;
+    const wait = lastDockAttempt + DOCK_MIN_INTERVAL_MS - Date.now();
+    if (docking || wait > 0) return scheduleDock(Math.max(wait, FOCUS_SETTLE_MS));
+    void dock(target.tab_id, target.workspace_id).then(() => {
+      // Focus moved to yet another tab while we were moving: catch up.
+      const now = focus.focused;
+      if (now && now.tab_id !== target.tab_id && now.tab_id !== selfTab) scheduleDock();
     });
   }, delay);
 }
@@ -290,81 +295,120 @@ async function movePane(destination: object): Promise<MoveResult> {
   return result;
 }
 
-/** Re-read which pane the HUD sits under, from the live layout. */
-async function refreshAnchor() {
-  if (!selfTab || !selfPane) return;
-  const { root } = await exportLayout(selfTab);
-  anchorPane = findAnchorPane(root, selfPane);
+/** Move any pane (not just the HUD); throws if herdr didn't move it. */
+async function moveOther(paneId: string, destination: object, focusIt = false) {
+  const r = await call<{ move_result?: MoveResult } & MoveResult>("pane.move", {
+    pane_id: paneId,
+    destination,
+    focus: focusIt,
+  });
+  if (!(r.move_result ?? r).changed) throw new Error(`could not move ${paneId}`);
 }
 
 /**
- * When the pane the HUD sits under closes, herdr hands its space to the HUD.
- * Move under the pane that got focus instead; if that's the HUD itself (it was
- * the last pane in the tab), the next keystroke elsewhere brings it along.
- * Other layout changes (splits, moves, other panes closing) re-read the
- * anchor so it stays right. A follow in progress sets the anchor itself.
- */
-function onLayoutEvent(ev: HerdrEvent) {
-  if (ev.kind === "pane.closed" && anchorPane && ev.data?.pane_id === anchorPane) {
-    anchorPane = null;
-    void relocate();
-    return;
-  }
-  if (!following) void refreshAnchor().catch(() => {});
-}
-
-async function relocate() {
-  if (!cfg.follow || DEMO) return;
-  const target = (await listPanes().catch(() => [])).find((p) => p.focused);
-  if (target && target.pane_id !== selfPane) {
-    lastFollowAttempt = 0;
-    await follow(target);
-  }
-}
-
-/**
- * Move the HUD under the pane being typed in when it isn't already there.
- * Triggered by typing rather than focus, so browsing panes and workspaces
- * doesn't reshuffle layouts.
+ * Put the HUD in a full-width strip at the bottom of `tabId`.
  *
- * herdr refuses pane.move within one tab, so a same-tab follow parks the HUD
- * in a temporary tab and moves it back under the target. The temporary tab
- * closes by itself when the HUD leaves it, and focus never changes.
+ * - If the tab's bottom row is one full-width pane, the HUD just splits it.
+ * - Otherwise the tab is rebuilt as down(<its layout>, HUD): the HUD parks
+ *   in a holding tab, the tab's other panes join it there, the HUD goes under
+ *   the one pane left, and the others move back in, recreating the original
+ *   splits. Processes keep running and pane ids don't change; focus returns
+ *   to the pane you were in. The holding tab closes by itself once empty.
  */
-async function follow(target: { pane_id: string; tab_id: string; workspace_id: string }) {
-  const now = Date.now();
-  if (!selfPane || following || now - lastFollowAttempt < FOLLOW_MIN_INTERVAL_MS) return;
-  following = true;
-  lastFollowAttempt = now;
+async function dock(tabId: string, workspaceId: string | null) {
+  if (!selfPane || docking) return;
+  docking = true;
+  lastDockAttempt = Date.now();
   const home = selfTab;
-  const into = { type: "tab", tab_id: target.tab_id, target_pane_id: target.pane_id, split: "down" };
+  let holding: string | null = null;
+  let tree: LayoutNode | null = null;
   try {
-    // The layout may have changed (e.g. the old anchor closed) since we
-    // last looked; skip the move if the HUD is already under the target.
-    await refreshAnchor().catch(() => {});
-    if (anchorPane === target.pane_id) return;
-    if (target.tab_id === selfTab) {
-      const out = await movePane({ type: "new_tab", workspace_id: target.workspace_id });
-      if (!out.changed) return; // zoomed tab: retry on a later keystroke
-      const back = await movePane(into).catch(() => null);
-      if (!back?.changed && home) {
-        // Couldn't land under the target: at least return to the original tab.
-        await movePane({ type: "tab", tab_id: home, split: "down" }).catch(() => {});
-        return;
-      }
+    const exported = await exportLayout(tabId);
+    if (exported.zoomed) return; // herdr refuses moves in zoomed tabs
+    tree = withoutPane(exported.root, selfPane);
+    const first = tree && leftmost(tree);
+    if (!tree || !first) return; // nothing to dock under
+
+    const snap = await paneLayout(first);
+    const others = snap.panes.filter((p) => p.pane_id !== selfPane);
+    const bottom = bottomPane(others, snap.area);
+    const bottomRect = others.find((p) => p.pane_id === bottom)?.rect;
+    const simple = !!bottom && bottomRect?.width === snap.area.width;
+
+    if (simple && tabId !== selfTab) {
+      if (!(await movePane({ type: "tab", tab_id: tabId, target_pane_id: bottom, split: "down" })).changed) return;
     } else {
-      const moved = await movePane(into);
-      if (!moved.changed) return;
+      // Park the HUD in a fresh tab; it doubles as the holding tab.
+      if (!(await movePane({ type: "new_tab", workspace_id: workspaceId ?? selfWorkspace })).changed) return;
+      holding = selfTab;
+      if (simple) {
+        await movePane({ type: "tab", tab_id: tabId, target_pane_id: bottom, split: "down" });
+      } else {
+        const focused = focus.focused?.tab_id === tabId ? focus.focused.pane_id : null;
+        const moves = rebuildMoves(tree);
+        for (const m of moves) {
+          await moveOther(m.pane, { type: "tab", tab_id: holding, target_pane_id: selfPane, split: "right" });
+        }
+        if (!(await movePane({ type: "tab", tab_id: tabId, target_pane_id: first, split: "down" })).changed) {
+          throw new Error("could not dock");
+        }
+        for (const m of moves) {
+          await moveOther(m.pane, { type: "tab", tab_id: tabId, target_pane_id: m.target, split: m.split }, m.pane === focused);
+        }
+        for (const r of ratioPaths(tree, [false])) await setSplitRatio(tabId, r.path, r.ratio).catch(() => {});
+      }
+      holding = null;
     }
-    anchorPane = target.pane_id;
     saveHome();
     lastFrame = "";
     await sizeSelf().catch(() => {});
   } catch {
-    // Leave the HUD where it is; a later keystroke retries.
+    await recover(tabId, holding, home, tree);
   } finally {
-    following = false;
+    docking = false;
   }
+}
+
+/** A dock failed midway: bring stranded panes and the HUD back, best effort. */
+async function recover(tabId: string, holding: string | null, home: string | null, tree: LayoutNode | null) {
+  if (holding) {
+    const anchor = tree && leftmost(tree);
+    const stranded = (await listPanes().catch(() => [])).filter((p) => p.tab_id === holding && p.pane_id !== selfPane);
+    for (const p of stranded) {
+      await moveOther(p.pane_id, { type: "tab", tab_id: tabId, target_pane_id: anchor ?? undefined, split: "right" }).catch(
+        () => {},
+      );
+    }
+  }
+  if (selfTab === holding || (home && selfTab !== home && selfTab !== tabId)) {
+    await movePane({ type: "tab", tab_id: home && home !== holding ? home : tabId, split: "down" }).catch(() => {});
+  }
+}
+
+/** Re-dock unless the HUD is a full-width strip at the bottom of its tab. */
+async function checkDocked() {
+  if (!cfg.follow || DEMO || docking || !selfPane || !selfTab) return;
+  const snap = await paneLayout(selfPane);
+  const me = snap.panes.find((p) => p.pane_id === selfPane);
+  if (!me) return;
+  if (snap.panes.length === 1) {
+    // Everything else in this tab closed: go to the tab you're in, if any.
+    const f = focus.focused;
+    if (f && f.tab_id !== selfTab) void dock(f.tab_id, f.workspace_id);
+    return;
+  }
+  const atBottom = me.rect.y + me.rect.height >= snap.area.y + snap.area.height;
+  const fullWidth = me.rect.x === snap.area.x && me.rect.width === snap.area.width;
+  if (atBottom && fullWidth) {
+    // A closed neighbor's space goes to the HUD: shrink back to size.
+    if (me.rect.height > cfg.hudHeight + 1) await sizeSelf().catch(() => {});
+    return;
+  }
+  void dock(selfTab, selfWorkspace);
+}
+
+function onLayoutEvent(_ev: HerdrEvent) {
+  if (!docking) void checkDocked().catch(() => {});
 }
 
 // ---------------------------------------------------------------- lifecycle
@@ -438,10 +482,10 @@ async function main() {
     saveHome();
   }
   focus.onEvent = onLayoutEvent;
-  focus.onFocusChange = () => followFocus();
+  focus.onFocusChange = () => scheduleDock();
   await focus.start();
   void sizeSelf().catch(() => {});
-  await refreshAnchor().catch(() => {});
+  await checkDocked().catch(() => {});
   accent?.recover();
   if (cfg.itermTint || cfg.itermFlash || cfg.itermBadge) iterm.start();
 
